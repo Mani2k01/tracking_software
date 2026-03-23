@@ -1,5 +1,5 @@
-const fs = require('fs');
-const https = require('https');
+// const fs = require('fs');
+// const https = require('https');
 const express = require('express');
 const Database = require("./db");
 
@@ -106,12 +106,17 @@ app.get("/get-location/:order_id", async (req, res) => {
 });
 
 
-https.createServer(
-    {
-        key: fs.readFileSync("server.key"),
-        cert: fs.readFileSync("server.cert"),
-    },
-    app
-).listen(PORT, "0.0.0.0", () => {
-    console.log("🚀 HTTPS Server running at https://0.0.0.0:3000");
+// https.createServer(
+//     {
+//         key: fs.readFileSync("server.key"),
+//         cert: fs.readFileSync("server.cert"),
+//     },
+//     app
+// ).listen(PORT, "0.0.0.0", () => {
+//     console.log("🚀 HTTPS Server running at https://0.0.0.0:3000");
+// });
+
+
+app.listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 Server running on port ${PORT}`);
 });
