@@ -9,6 +9,7 @@ app.use(express.json());
 app.use(express.static("public"));
 
 const db = new Database();
+const PORT = 3000;
 
 app.get("/", (req, res) => {
     res.send("HTTPS working ✅");
@@ -111,6 +112,6 @@ https.createServer(
         cert: fs.readFileSync("server.cert"),
     },
     app
-).listen(3000, "0.0.0.0", () => {
+).listen(PORT, "0.0.0.0", () => {
     console.log("🚀 HTTPS Server running at https://0.0.0.0:3000");
 });
