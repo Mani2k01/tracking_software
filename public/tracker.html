@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Delivery Tracker</title>
+</head>
+<body>
+
+<h2>🚴 Delivery Tracking Active</h2>
+
+<script>
+const orderId = new URLSearchParams(window.location.search).get("order_id");
+
+if(!orderId) {
+    alert("No order id provided");
+
+}
+navigator.geolocation.watchPosition(
+    (pos) => {
+
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+
+        console.log("Sending:", lat, lng);
+
+        fetch("/update_location", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                order_id: orderId,
+                latitude: lat,
+                longitude: lng
+            })
+        });
+
+    },
+    (err) => {
+        console.log("GPS ERROR:", err.message);
+        alert(err.message);
+    }
+);
+</script>
+
+</body>
+</html>
