@@ -1,8 +1,5 @@
 const { Pool } = require("pg");
 
-// for env variables
-require('dotenv').config();
-
 const pool = new Pool({
   user: "postgres",
   host: "localhost",
