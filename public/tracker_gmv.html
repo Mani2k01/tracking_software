@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <title>Delivery Navigation</title>
+
+    <style>
+        body {
+            font-family: Arial;
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            height: 500px;
+            width: 100%;
+        }
+
+        .controls {
+            padding: 15px;
+            background: #f4f4f4;
+        }
+
+        button {
+            padding: 10px 18px;
+            font-size: 16px;
+            background: #2e7d32;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1b5e20;
+        }
+
+        button.delivered{
+            background:#d32f2f;
+            font-weight:bold;
+            margin-left:10px;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <h2 style="padding:15px;">🚴 Delivery Navigation</h2>
+
+    <div id="map"></div>
+
+    <div class="controls">
+
+        <p><b>Destination:</b> <span id="address">Loading...</span></p>
+
+        <button onclick="openNavigation()">📍 Navigate with Google Maps</button>
+        <button onclick="markDelivered()" style="background:#1565c0;margin-left:10px;">
+            ✔ Order Delivered
+        </button>
+
+    </div>
+
+
+    <script>
+
+        const orderId = new URLSearchParams(window.location.search).get("order_id");
+
+        let deliveryAddress = "";
+        let riderLat = null;
+        let riderLng = null;
+
+
+        navigator.geolocation.watchPosition(
+
+            (pos) => {
+
+                riderLat = pos.coords.latitude;
+                riderLng = pos.coords.longitude;
+
+                console.log("Rider:", riderLat, riderLng);
+
+                fetch("/update_location", {
+
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+
+                    body: JSON.stringify({
+
+                        order_id: orderId,
+                        latitude: riderLat,
+                        longitude: riderLng
+
+                    })
+
+                });
+
+            },
+
+            (err) => {
+                alert("GPS Error: " + err.message);
+            },
+
+            { enableHighAccuracy: true }
+
+        );
+
+
+        fetch("/destination/" + orderId)
+            .then(res => res.json())
+            .then(data => {
+
+                console.log("API Response:", data);
+
+                deliveryAddress = data.delivery_address;
+
+                document.getElementById("address").innerText = deliveryAddress;
+
+            })
+            .catch(err => {
+
+                console.error("Fetch error:", err);
+
+                document.getElementById("address").innerText = "Failed to load";
+
+            });
+
+
+        function openNavigation() {
+
+            if (!deliveryAddress) {
+                alert("Destination not available");
+                return;
+            }
+
+            const url =
+                "https://www.google.com/maps/dir/?api=1&destination="
+                + encodeURIComponent(deliveryAddress);
+
+            window.open(url, "_blank");
+
+        }
+
+
+        function initMap() {
+
+            const map = new google.maps.Map(document.getElementById("map"), {
+
+                zoom: 14,
+                center: { lat: 9.45, lng: 77.79 }
+
+            });
+
+        }
+
+        function markDelivered(){
+
+            if(!confirm("Confirm order delivered?")){
+                return;
+            }
+
+            fetch("/order-delivered",{
+
+                method:"POST",
+                headers:{ "Content-Type":"application/json" },
+
+                body:JSON.stringify({
+                order_id:orderId
+                })
+
+            })
+
+            .then(res=>res.json())
+
+            .then(data=>{
+
+            if(data.success){
+
+                alert("Order marked as delivered");
+
+                window.location="/";
+
+                }
+
+            });
+
+        }
+
+
+    </script>
+
+
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAP_API_KEY">
+    </script>
+
+</body>
+
+</html>

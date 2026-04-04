@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <title>Online Orders</title>
+
+    <style>
+        body{
+            font-family: Arial, Helvetica, sans-serif;
+            background:#eef1f5;
+            margin:0;
+            padding:30px;
+        }
+
+        .page{
+            display:flex;
+            flex-direction:column;
+            gap:40px;
+        }
+
+        /* SECTION PANELS */
+
+        .section{
+            background:white;
+            padding:25px;
+            border-radius:12px;
+            box-shadow:0 6px 16px rgba(0,0,0,0.08);
+        }
+
+        .pending-section{
+            border-left:6px solid #ff9800;
+        }
+
+        .picked-section{
+            border-left:6px solid #4caf50;
+        }
+
+        .section-header{
+            font-size:22px;
+            font-weight:bold;
+            margin-bottom:20px;
+        }
+
+        /* ORDER GRID */
+
+        .orders-grid{
+            display:grid;
+            grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+            gap:20px;
+        }
+
+        /* ORDER CARD */
+
+        .order-card{
+            background:#f9fafc;
+            border-radius:10px;
+            padding:18px;
+            box-shadow:0 3px 8px rgba(0,0,0,0.06);
+            transition:0.2s;
+        }
+
+        .order-card:hover{
+            transform:translateY(-4px);
+        }
+
+        /* TEXT */
+
+        .order-id{
+            font-weight:bold;
+            font-size:16px;
+        }
+
+        .customer{
+            margin-top:6px;
+            color:#555;
+        }
+
+        .amount{
+            margin-top:8px;
+            font-weight:bold;
+            color:#2e7d32;
+        }
+
+        /* BUTTONS */
+
+        .options{
+            margin-top:14px;
+        }
+
+        .btn{
+            border:none;
+            padding:8px 14px;
+            border-radius:6px;
+            cursor:pointer;
+            font-weight:bold;
+        }
+
+        .btn-delivery{
+            background:#ff9800;
+            color:white;
+        }
+
+        .btn-track{
+            background:#1976d2;
+            color:white;
+        }
+    </style>
+
+</head>
+
+<body>
+
+
+    <div class="page">
+
+        <div class="section pending-section">
+
+            <div class="section-header">
+                📦 Pending Orders
+            </div>
+
+            <div id="pendingOrders" class="orders-grid"></div>
+
+        </div>
+
+
+        <div class="section picked-section">
+
+            <div class="section-header">
+                🚴 Picked Orders
+            </div>
+
+            <div id="pickedOrders" class="orders-grid"></div>
+
+        </div>
+
+    </div>
+
+
+    <script>
+
+        let selectedOrder = null;
+
+        function loadOrders() {
+
+            fetch("/online-orders")
+                .then(res => res.json())
+                .then(data => {
+
+                    const pendingContainer = document.getElementById("pendingOrders");
+                    const pickedContainer = document.getElementById("pickedOrders");
+
+                    pendingContainer.innerHTML = "";
+                    pickedContainer.innerHTML = "";
+
+
+                    // Pending orders
+                    data.pending.forEach(order => {
+
+                        const card = document.createElement("div");
+                        card.className = "order-card";
+
+                        card.innerHTML = `
+<div class="order-id">Order #${order.order_id}</div>
+<div class="customer">Customer: ${order.name}</div>
+<div class="amount">₹ ${order.order_amount}</div>
+
+<div class="options">
+<button class="btn btn-delivery"
+onclick="startDelivery('${order.order_id}')">
+🚴 Start Delivery
+</button>
+</div>
+`;
+
+                        pendingContainer.appendChild(card);
+
+                    });
+
+
+                    // Picked orders
+                    data.picked.forEach(order => {
+
+                        const card = document.createElement("div");
+                        card.className = "order-card";
+
+                        card.innerHTML = `
+<div class="order-id">Order #${order.order_id}</div>
+<div class="customer">Customer: ${order.name}</div>
+<div class="amount">₹ ${order.order_amount}</div>
+
+<div class="options" style="display:block">
+
+<button class="btn btn-track"
+onclick="trackOrder('${order.order_id}')">
+📍 Track Delivery
+</button>
+
+</div>
+`;
+
+                        pickedContainer.appendChild(card);
+
+                    });
+
+                });
+
+        }
+        function showOptions(orderId) {
+
+            document.querySelectorAll(".options").forEach(o => {
+                o.style.display = "none";
+            });
+
+            const opt = document.getElementById("opt_" + orderId);
+            opt.style.display = "block";
+
+            selectedOrder = orderId;
+
+        }
+
+        function startDelivery(orderId) {
+
+            fetch("/start-delivery", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ order_id: orderId })
+            })
+                .then(res => res.json())
+                .then(data => {
+
+                    if (data.success) {
+                        window.location = "/tracker.html?order_id=" + orderId;
+                    }
+
+                });
+
+        }
+
+        function trackOrder(orderId) {
+
+            fetch("/order-status/" + orderId)
+                .then(res => res.json())
+                .then(data => {
+
+                    if (data.status !== "DELIVERY_PICKED") {
+                        alert("🚫 Delivery not started yet. Start delivery first.");
+                        return;
+
+                    }
+
+                    window.location = "/dashboard.html?order_id=" + orderId;
+
+                });
+
+        }
+
+        setInterval(loadOrders, 5000);
+        loadOrders();
+
+    </script>
+
+</body>
+
+</html>

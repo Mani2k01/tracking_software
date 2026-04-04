@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Delivery Tracking Dashboard</title>
+
+    <style>
+        body {
+            font-family: Arial;
+            margin: 0;
+            padding: 0;
+        }
+
+        .topbar {
+            background: #111;
+            color: white;
+            padding: 15px;
+            font-size: 20px;
+        }
+
+        .container {
+            padding: 20px;
+        }
+
+        button {
+            padding: 12px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 6px;
+            background: #2e7d32;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1b5e20;
+        }
+
+        .status {
+            margin-top: 20px;
+            font-size: 16px;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <div class="topbar">
+        📦 Live Order Tracking
+    </div>
+
+    <div class="container">
+
+        <p><b>Order ID:</b> <span id="orderIdText"></span></p>
+
+        <p><b>Destination:</b> <span id="address">Loading...</span></p>
+
+        <button onclick="openNavigation()">
+            📍 View Live Route in Google Maps
+        </button>
+
+        <div class="status" id="status">
+            Waiting for rider location...
+        </div>
+
+    </div>
+
+    <script>
+
+        const orderId = new URLSearchParams(window.location.search).get("order_id");
+
+        document.getElementById("orderIdText").innerText = orderId;
+
+        let riderLat = null;
+        let riderLng = null;
+        let deliveryAddress = "";
+
+
+        /* ---------- FETCH CUSTOMER ADDRESS ---------- */
+
+        fetch("/destination/" + orderId)
+
+            .then(res => res.json())
+
+            .then(data => {
+
+                deliveryAddress = data.delivery_address;
+
+                document.getElementById("address").innerText = deliveryAddress;
+
+            })
+
+            .catch(err => {
+
+                console.error(err);
+
+                document.getElementById("address").innerText = "Failed to load address";
+
+            });
+
+
+        /* ---------- FETCH RIDER LOCATION CONTINUOUSLY ---------- */
+
+        setInterval(() => {
+
+            fetch("/get-location/" + orderId)
+
+                .then(res => res.json())
+
+                .then(data => {
+
+                    if (!data) {
+                        document.getElementById("status").innerText =
+                            "Delivery not started yet.";
+                        return;
+                    }
+
+                    riderLat = data.latitude;
+                    riderLng = data.longitude;
+
+                    document.getElementById("status").innerText =
+                        "🚴 Rider Location: " + riderLat + ", " + riderLng;
+
+                })
+
+                .catch(err => {
+                    console.error(err);
+                });
+
+        }, 2000);
+
+
+
+        /* ---------- OPEN GOOGLE MAPS ---------- */
+
+        function openNavigation() {
+
+            if (!riderLat || !riderLng) {
+
+                alert("Rider location not available yet");
+                return;
+
+            }
+
+            if (!deliveryAddress) {
+
+                alert("Destination not available");
+                return;
+
+            }
+
+            const url =
+                "https://www.google.com/maps/dir/?api=1&origin="
+                + riderLat + "," + riderLng
+                + "&destination="
+                + encodeURIComponent(deliveryAddress);
+
+            window.open(url, "_blank");
+
+        }
+
+    </script>
+
+</body>
+
+</html>

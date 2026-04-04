@@ -1,121 +1,247 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <title>Tracking Dashboard</title>
 
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<head>
+    <title>Delivery Tracking Dashboard</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 
     <style>
+        body {
+            font-family: Arial;
+            margin: 0;
+            padding: 0;
+        }
+
+        .topbar {
+            background: #111;
+            color: white;
+            padding: 15px;
+            font-size: 20px;
+        }
+
+        .container {
+            padding: 20px;
+        }
+
         #map {
-            height: 400px;
+            height: 500px;
             margin-top: 20px;
         }
+
+        button {
+            padding: 12px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 6px;
+            background: #2e7d32;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1b5e20;
+        }
+
+        .status {
+            margin-top: 20px;
+            font-size: 16px;
+        }
     </style>
+
 </head>
+
 <body>
 
-<h2>📦 Order Tracking</h2>
+    <div class="topbar">
+        📦 Live Order Tracking
+    </div>
 
-<input id="orderId" placeholder="Enter Order ID">
-<button onclick="startTracking()">Track</button>
+    <div class="container">
 
-<p id="status">Waiting...</p>
+        <p><b>Order ID:</b> <span id="orderIdText"></span></p>
 
-<!-- MAP -->
-<div id="map"></div>
+        <p><b>Destination:</b> <span id="address">Loading...</span></p>
 
-<!-- Leaflet JS -->
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+        <button onclick="openNavigation()">
+            📍 View Live Route in Google Maps
+        </button>
 
-<script>
-let interval;
-let map;
-let marker;
-let firstLoad = true;
+        <div class="status" id="status">
+            Waiting for rider location...
+        </div>
 
-function startTracking() {
+        <div id="map"></div>
 
-    const orderId = document.getElementById("orderId").value;
+    </div>
 
-    if (!orderId) {
-        alert("Enter order id");
-        return;
-    }
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-    // Initialize map only once
-    if (!map) {
-        map = L.map('map').setView([12.9716, 77.5946], 15);
+    <script>
+
+        const orderId = new URLSearchParams(window.location.search).get("order_id");
+
+        document.getElementById("orderIdText").innerText = orderId;
+
+        let riderLat = null;
+        let riderLng = null;
+
+        let destLat = null;
+        let destLng = null;
+
+        let map;
+        let riderMarker;
+        let destMarker;
+        let routeLine;
+
+
+        /* ---------- INIT MAP ---------- */
+
+        map = L.map('map').setView([13.08, 80.27], 13);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap'
         }).addTo(map);
-    }
 
-    if (interval) clearInterval(interval);
 
-    interval = setInterval(() => {
 
-        fetch(`/get-location/${orderId}`)
-        .then(res => res.json())
-        .then(data => {
+        /* ---------- FETCH DESTINATION ---------- */
 
-            if (!data) {
-                document.getElementById("status").innerText = "No location yet";
-                return;
-            }
+        fetch("/destination/" + orderId)
 
-            const lat = data.latitude;
-            const lng = data.longitude;
+            .then(res => res.json())
 
-            document.getElementById("status").innerText =
-                `📍 Lat: ${lat}, Lng: ${lng}`;
+            .then(data => {
 
-            // FIRST TIME → create marker
-            if (!marker) {
-                const bikeIcon = L.icon({
-                    iconUrl: "https://cdn-icons-png.flaticon.com/512/2972/2972185.png", // bike icon
-                    iconSize: [40, 40],
-                    iconAnchor: [20, 20]
+                destLat = parseFloat(data.customer_lat);
+                destLng = parseFloat(data.customer_lng);
+
+                document.getElementById("address").innerText =
+                    destLat + ", " + destLng;
+
+                destMarker = L.marker([destLat, destLng])
+                    .addTo(map)
+                    .bindPopup("Customer Location");
+
+                map.setView([destLat, destLng], 15);
+
+            });
+
+
+
+        /* ---------- TRACK RIDER ---------- */
+
+        setInterval(() => {
+
+            fetch("/get-location/" + orderId)
+
+                .then(res => res.json())
+
+                .then(data => {
+
+                    if (!data) {
+
+                        document.getElementById("status").innerText =
+                            "Delivery not started yet";
+
+                        return;
+
+                    }
+
+                    riderLat = parseFloat(data.latitude);
+                    riderLng = parseFloat(data.longitude);
+
+                    document.getElementById("status").innerText =
+                        "🚴 Rider Location: " + riderLat + ", " + riderLng;
+
+                    updateRider();
+
                 });
 
-                marker = L.marker([lat, lng], { icon: bikeIcon }).addTo(map);
-                map.setView([lat, lng], 15);
+        }, 2000);
+
+
+
+        /* ---------- UPDATE RIDER MARKER ---------- */
+
+        function updateRider() {
+
+            if (!riderLat || !riderLng) return;
+
+            if (!riderMarker) {
+
+                const bikeIcon = L.icon({
+
+                    iconUrl: "https://cdn-icons-png.flaticon.com/512/1046/1046784.png",
+                    iconSize: [40, 40],
+                    iconAnchor: [20, 20]
+
+                });
+
+                riderMarker = L.marker([riderLat, riderLng], { icon: bikeIcon })
+                    .addTo(map)
+                    .bindPopup("Delivery Rider");
+
+            } else {
+
+                riderMarker.setLatLng([riderLat, riderLng]);
+
+            }
+
+            drawRoute();
+
+        }
+
+
+
+        /* ---------- DRAW ROUTE ---------- */
+
+        function drawRoute() {
+
+            if (!destLat || !destLng) return;
+
+            if (routeLine) {
+
+                map.removeLayer(routeLine);
+
+            }
+
+            routeLine = L.polyline([
+
+                [riderLat, riderLng],
+                [destLat, destLng]
+
+            ], {
+
+                color: "blue",
+                weight: 4
+
+            }).addTo(map);
+
+        }
+
+
+
+        /* ---------- OPEN GOOGLE MAPS ---------- */
+
+        function openNavigation() {
+
+            if (!riderLat || !riderLng) {
+                alert("Rider location unavailable");
                 return;
             }
 
-            // MOVE marker smoothly
-            smoothMove(marker.getLatLng(), [lat, lng]);
+            const url =
+                "https://www.google.com/maps/dir/?api=1&origin="
+                + riderLat + "," + riderLng +
+                "&destination=" + destLat + "," + destLng;
 
-        });
+            window.open(url, "_blank");
 
-    }, 2000);
-}
+        }
 
-// 🔥 Smooth animation function
-function smoothMove(from, to) {
-
-    const frames = 20;
-    let i = 0;
-
-    const latStep = (to[0] - from.lat) / frames;
-    const lngStep = (to[1] - from.lng) / frames;
-
-    const interval = setInterval(() => {
-
-        i++;
-
-        const lat = from.lat + latStep * i;
-        const lng = from.lng + lngStep * i;
-
-        marker.setLatLng([lat, lng]);
-
-        if (i >= frames) clearInterval(interval);
-
-    }, 50);
-}
-
-</script>
+    </script>
 
 </body>
+
 </html>

@@ -1,0 +1,15 @@
+header - need to add logo - otherwise ok, theme need to set as green
+
+product bio - contents needed - product image need to set(prdct img needed)
+
+about product - content needed
+
+beneifts - new section need to add - why core 30? - content needed
+
+ingredients sections - new section need to add - content needed
+
+questions & answers - need to modify
+
+reviews - new section need to add - ( reviews need to be added ) - content needed (horizontal scrolling needed for review)
+
+contact - link need to given for contact, address need to be added - content needed

@@ -1,44 +1,267 @@
 <!DOCTYPE html>
 <html>
+
 <head>
-    <title>Delivery Tracker</title>
+
+    <title>Delivery Navigation</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+    <style>
+        body {
+            font-family: Arial;
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            height: 500px;
+            width: 100%;
+        }
+
+        .controls {
+            padding: 15px;
+            background: #f4f4f4;
+        }
+
+        button {
+            padding: 10px 18px;
+            font-size: 16px;
+            background: #2e7d32;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1b5e20;
+        }
+
+        button.delivered {
+            background: #1565c0;
+            margin-left: 10px;
+        }
+    </style>
+
 </head>
+
 <body>
 
-<h2>🚴 Delivery Tracking Active</h2>
+    <h2 style="padding:15px;">🚴 Delivery Navigation</h2>
 
-<script>
-const orderId = new URLSearchParams(window.location.search).get("order_id");
+    <div id="map"></div>
 
-if(!orderId) {
-    alert("No order id provided");
+    <div class="controls">
 
-}
-navigator.geolocation.watchPosition(
-    (pos) => {
+        <p><b>Destination:</b> <span id="address">Loading...</span></p>
 
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
+        <button onclick="openNavigation()">📍 Navigate with Google Maps</button>
 
-        console.log("Sending:", lat, lng);
+        <button class="delivered" onclick="markDelivered()">
+            ✔ Order Delivered
+        </button>
 
-        fetch("/update_location", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                order_id: orderId,
-                latitude: lat,
-                longitude: lng
+    </div>
+
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <script>
+
+        const orderId = new URLSearchParams(window.location.search).get("order_id");
+
+        let map;
+        let riderMarker;
+        let destMarker;
+        let routeLine;
+
+        let riderLat = null;
+        let riderLng = null;
+
+        let destLat = null;
+        let destLng = null;
+
+
+        /* ---------- MAP INIT ---------- */
+
+        map = L.map('map').setView([13.08, 80.27], 13);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+
+        /* ---------- FETCH DESTINATION ---------- */
+
+        fetch("/destination/" + orderId)
+
+            .then(res => res.json())
+
+            .then(data => {
+
+                destLat = parseFloat(data.customer_lat);
+                destLng = parseFloat(data.customer_lng);
+
+                document.getElementById("address").innerText =
+                    destLat + ", " + destLng;
+
+                destMarker = L.marker([destLat, destLng])
+                    .addTo(map)
+                    .bindPopup("Customer Location");
+
+                map.setView([destLat, destLng], 15);
+
+            });
+
+
+        /* ---------- RIDER GPS ---------- */
+
+        navigator.geolocation.watchPosition(
+
+            (pos) => {
+
+                riderLat = pos.coords.latitude;
+                riderLng = pos.coords.longitude;
+
+                fetch("/update_location", {
+
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+
+                    body: JSON.stringify({
+
+                        order_id: orderId,
+                        latitude: riderLat,
+                        longitude: riderLng
+
+                    })
+
+                });
+
+                updateRider();
+
+            },
+
+            (err) => {
+                alert("GPS error: " + err.message);
+            },
+
+            { enableHighAccuracy: true }
+
+        );
+
+
+
+        /* ---------- UPDATE RIDER MARKER ---------- */
+
+        function updateRider() {
+
+            if (!riderLat || !riderLng) return;
+
+            if (!riderMarker) {
+
+                const bikeIcon = L.icon({
+                    iconUrl:"https://cdn-icons-png.flaticon.com/512/1046/1046784.png",
+                    iconSize:[42,42],
+                    iconAnchor:[21,21]
+                });
+
+                riderMarker = L.marker([riderLat, riderLng], { icon: bikeIcon })
+                    .addTo(map)
+                    .bindPopup("Delivery Rider");
+
+            } else {
+
+                riderMarker.setLatLng([riderLat, riderLng]);
+
+            }
+
+            drawRoute();
+
+        }
+
+
+        /* ---------- DRAW ROUTE ---------- */
+
+        function drawRoute() {
+
+            if (!destLat || !destLng) return;
+
+            if (routeLine) {
+                map.removeLayer(routeLine);
+            }
+
+            routeLine = L.polyline([
+
+                [riderLat, riderLng],
+                [destLat, destLng]
+
+            ], {
+
+                color: "blue",
+                weight: 4
+
+            }).addTo(map);
+
+        }
+
+
+
+        /* ---------- OPEN GOOGLE MAPS ---------- */
+
+        function openNavigation() {
+
+            if (!destLat || !destLng) {
+                alert("Destination unavailable");
+                return;
+            }
+
+            const url =
+                "https://www.google.com/maps/dir/?api=1&destination="
+                + destLat + "," + destLng;
+
+            window.open(url, "_blank");
+
+        }
+
+
+        /* ---------- MARK DELIVERED ---------- */
+
+        function markDelivered() {
+
+            if (!confirm("Confirm order delivered?")) return;
+
+            fetch("/order-delivered", {
+
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+
+                body: JSON.stringify({
+
+                    order_id: orderId
+
+                })
+
             })
-        });
 
-    },
-    (err) => {
-        console.log("GPS ERROR:", err.message);
-        alert(err.message);
-    }
-);
-</script>
+                .then(res => res.json())
+
+                .then(data => {
+
+                    if (data.success) {
+
+                        alert("Order marked as delivered");
+                        window.location = "/";
+
+                    }
+
+                });
+
+        }
+
+    </script>
 
 </body>
+
 </html>
