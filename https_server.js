@@ -21,7 +21,7 @@ app.get("/online-orders", async (req, res) => {
     try {
 
         const pending = await db.fetch_all_data(
-            "SELECT * FROM food_order WHERE order_type='ONLINE'"
+            "SELECT * FROM food_order WHERE order_type='ONLINE' AND order_status ='PICKED'"
         );
 
         const picked = await db.fetch_all_data(
