@@ -86,15 +86,86 @@ app.get("/order-status/:order_id", async (req, res) => {
 
 });
 
+// app.get("/destination/:order_id", async (req, res) => {
+
+//     console.log("Fetching destination for order_id:", req.params.order_id);
+//     const order_id = req.params.order_id;
+
+//     try {
+
+//         const result = await db.fetch_data(
+//             `SELECT delivery_address, customer_lat, customer_lng
+//              FROM food_order
+//              WHERE order_id=$1`,
+//             [order_id]
+//         );
+
+//         if (!result || result.length === 0) {
+//             return res.status(404).json({ error: "Order not found" });
+//         }
+
+//         let address = result[0].delivery_address;
+//         let lat = result[0].customer_lat;
+//         let lng = result[0].customer_lng;
+
+//         // If coordinates already exist → return them
+//         if (lat && lng) {
+//             return res.json({
+//                 delivery_address: address,
+//                 customer_lat: lat,
+//                 customer_lng: lng
+//             });
+//         }
+
+//         // Otherwise convert address → coordinates
+//         const geo = await geocodeAddress(address);
+//         console.log("Geocode result:", geo);
+
+//         if (!geo) {
+//             return res.json({
+//                 delivery_address: address,
+//                 customer_lat: null,
+//                 customer_lng: null
+//             });
+//         }
+
+//         lat = geo.lat;
+//         lng = geo.lng;
+
+//         console.log("Coordinates found:", lat, lng);
+//         // Save coordinates in DB
+//         await db.update_data(
+//             `UPDATE food_order
+//              SET customer_lat=$1, customer_lng=$2
+//              WHERE order_id=$3`,
+//             [lat, lng, order_id]
+//         );
+
+//         res.json({
+//             delivery_address: address,
+//             customer_lat: lat,
+//             customer_lng: lng
+//         });
+
+//     } catch (err) {
+
+//         console.error(err);
+//         res.status(500).json({ error: "Failed to fetch destination" });
+
+//     }
+
+// });
+
 app.get("/destination/:order_id", async (req, res) => {
 
     console.log("Fetching destination for order_id:", req.params.order_id);
+
     const order_id = req.params.order_id;
 
     try {
 
         const result = await db.fetch_data(
-            `SELECT delivery_address, customer_lat, customer_lng
+            `SELECT delivery_address
              FROM food_order
              WHERE order_id=$1`,
             [order_id]
@@ -104,42 +175,23 @@ app.get("/destination/:order_id", async (req, res) => {
             return res.status(404).json({ error: "Order not found" });
         }
 
-        let address = result[0].delivery_address;
-        let lat = result[0].customer_lat;
-        let lng = result[0].customer_lng;
+        const address = result[0].delivery_address;
 
-        // If coordinates already exist → return them
-        if (lat && lng) {
+        if (!address) {
             return res.json({
-                delivery_address: address,
-                customer_lat: lat,
-                customer_lng: lng
-            });
-        }
-
-        // Otherwise convert address → coordinates
-        const geo = await geocodeAddress(address);
-        console.log("Geocode result:", geo);
-
-        if (!geo) {
-            return res.json({
-                delivery_address: address,
+                delivery_address: null,
                 customer_lat: null,
                 customer_lng: null
             });
         }
 
-        lat = geo.lat;
-        lng = geo.lng;
+        // address format: "12.856301,77.676331"
+        const parts = address.split(",");
 
-        console.log("Coordinates found:", lat, lng);
-        // Save coordinates in DB
-        await db.update_data(
-            `UPDATE food_order
-             SET customer_lat=$1, customer_lng=$2
-             WHERE order_id=$3`,
-            [lat, lng, order_id]
-        );
+        const lat = parseFloat(parts[0]);
+        const lng = parseFloat(parts[1]);
+
+        console.log("Destination coordinates:", lat, lng);
 
         res.json({
             delivery_address: address,
@@ -150,6 +202,7 @@ app.get("/destination/:order_id", async (req, res) => {
     } catch (err) {
 
         console.error(err);
+
         res.status(500).json({ error: "Failed to fetch destination" });
 
     }
